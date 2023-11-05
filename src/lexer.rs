@@ -1,5 +1,3 @@
-
-
 use crate::token::*;
 
 pub struct Lexer;
@@ -104,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn basic_example() {
+    fn basic() {
         let src = r#"let x  = 5 + (4 / 3);"#;
 
         let tokens = Lexer::tokenize(src);

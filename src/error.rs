@@ -1,11 +1,11 @@
 use thiserror::Error;
 
+use crate::ast::Stmt;
+
 #[derive(Error, Debug, PartialEq)]
 pub enum EnvError {
     #[error("Cannot redeclare variable {0}")]
     RedeclareVariable(String),
-    #[error("Cannot resolve {0}")]
-    UnresolvedVariable(String),
     #[error("Cannot reassign to constant {0}")]
     ReassignVariable(String),
     #[error("Cannot resolve {0} since it doesnt exist")]
@@ -20,4 +20,6 @@ pub enum EvalError {
     InvalidAssignment,
     #[error("Unsupported binary operator {0}")]
     InvalidOperator(String),
+    #[error("Value {0:?} is not a function")]
+    ValueNotAFunction(Stmt),
 }

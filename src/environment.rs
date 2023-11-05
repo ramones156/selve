@@ -1,10 +1,14 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::SystemTime,
+};
 
 use crate::{
     error::EnvError,
     values::{self, RuntimeValue},
 };
 
+#[derive(Debug, PartialEq)]
 pub struct Environment {
     parent: Option<Box<Environment>>,
     variables: HashMap<String, RuntimeValue>,
@@ -25,9 +29,26 @@ impl Environment {
     }
 
     fn setup_scope(&mut self) {
-        self.declare_var("true", values::RuntimeValue::Boolean(true), true);
-        self.declare_var("false", values::RuntimeValue::Boolean(false), true);
-        self.declare_var("null", values::RuntimeValue::Null, true);
+        self.declare_var("true", RuntimeValue::Boolean(true), true);
+        self.declare_var("false", RuntimeValue::Boolean(false), true);
+        self.declare_var("null", RuntimeValue::Null, true);
+
+        fn print(
+            args: Vec<values::RuntimeValue>,
+            environment: &mut Environment,
+        ) -> values::RuntimeValue {
+            args.iter().for_each(|arg| println!("{arg}"));
+
+            RuntimeValue::Null
+        }
+        self.declare_var("print", RuntimeValue::NativeFn(print), true);
+        fn time(
+            args: Vec<values::RuntimeValue>,
+            environment: &mut Environment,
+        ) -> values::RuntimeValue {
+            RuntimeValue::Number("Friday 13th".to_string())
+        }
+        self.declare_var("time", RuntimeValue::NativeFn(time), true);
     }
 
     pub fn with(parent_env: Environment) -> Self {
@@ -98,7 +119,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn basic_example() {
+    fn basic() {
         let mut env = Environment::new();
         assert_eq!(RuntimeValue::Boolean(true), env.lookup_var("true").unwrap());
         assert_eq!(

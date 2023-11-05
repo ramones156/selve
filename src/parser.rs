@@ -290,12 +290,13 @@ impl Parser {
     }
 
     fn parse_args_list(&mut self) -> Vec<Stmt> {
-        let mut args = vec![self.parse_expr()];
+        let mut args = vec![self.parse_assignment_expr()];
 
         while let Some(t) = self.peek() {
             if t.token_type != TokenType::Comma || self.eat().is_none() {
                 break;
             }
+
             args.push(self.parse_assignment_expr());
         }
 
@@ -310,12 +311,11 @@ impl Parser {
                 break;
             }
 
-            let computed;
-            let property;
+            if let Some(operator) = self.eat() {
+                let computed;
+                let property;
 
-            if let Some(operator) = self.peek() {
                 if operator.token_type == TokenType::Dot {
-                    computed = false;
                     property = self.parse_primary_expr();
 
                     if let Stmt::Identifier(_) = property {
@@ -331,6 +331,7 @@ impl Parser {
                         "Missing closing bracket in computed member expression",
                     );
                 }
+
                 object = Stmt::MemberExpr {
                     object: Box::new(object),
                     property: Box::new(property),
@@ -346,9 +347,10 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::Stmt::AssignmentExpr;
 
     #[test]
-    fn basic_example() {
+    fn basic() {
         let input = "45 + (foo + 4) % bar";
         let mut parser = Parser::new();
 
@@ -368,6 +370,105 @@ mod tests {
                 operator: "+".to_owned(),
             }],
         };
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn assignment() {
+        let expected = Program {
+            body: vec![
+                Stmt::VarDeclaration {
+                    constant: false,
+                    identifier: "foo".to_string(),
+                    value: Some(Box::new(Stmt::BinaryExpr {
+                        left: Box::new(Stmt::NumericLiteral("50".to_string())),
+                        right: Box::new(Stmt::NumericLiteral("2".to_string())),
+                        operator: "/".to_string(),
+                    })),
+                },
+                Stmt::VarDeclaration {
+                    constant: true,
+                    identifier: "bar".to_string(),
+                    value: Some(Box::new(Stmt::ObjectLiteral(vec![
+                        Property {
+                            key: "x".to_string(),
+                            value: Some(Box::new(Stmt::NumericLiteral("100".to_string()))),
+                        },
+                        Property {
+                            key: "y".to_string(),
+                            value: Some(Box::new(Stmt::NumericLiteral("32".to_string()))),
+                        },
+                        Property {
+                            key: "foo".to_string(),
+                            value: None,
+                        },
+                        Property {
+                            key: "baz".to_string(),
+                            value: Some(Box::new(Stmt::ObjectLiteral(vec![Property {
+                                key: "z".to_string(),
+                                value: Some(Box::new(Stmt::Identifier("true".to_string()))),
+                            }]))),
+                        },
+                    ]))),
+                },
+            ],
+        };
+
+        let input = r#"
+            let foo = 50 / 2;
+            const bar = {
+                x: 100,
+                y: 32,
+                foo,
+                baz: {
+                    z: true,
+                }
+            };
+        "#;
+
+        let mut parser = Parser::new();
+
+        let program = parser.produce_ast(input.to_string());
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn call_expression() {
+        let expected = Program {
+            body: vec![
+                Stmt::VarDeclaration {
+                    constant: false,
+                    identifier: "foo".to_string(),
+                    value: Some(Box::new(Stmt::BinaryExpr {
+                        left: Box::new(Stmt::NumericLiteral("50".to_string())),
+                        right: Box::new(Stmt::NumericLiteral("2".to_string())),
+                        operator: "/".to_string(),
+                    })),
+                },
+                Stmt::CallExpr {
+                    args: vec![Stmt::BinaryExpr {
+                        left: Box::new(Stmt::BinaryExpr {
+                            left: Box::new(Stmt::NumericLiteral("40".to_string())),
+                            right: Box::new(Stmt::NumericLiteral("2".to_string())),
+                            operator: "*".to_string(),
+                        }),
+                        right: Box::new(Stmt::Identifier("foo".to_string())),
+                        operator: "+".to_string(),
+                    }],
+                    caller: Box::new(Stmt::Identifier("print".to_string())),
+                },
+            ],
+        };
+
+        let input = r#"
+            let foo = 50 / 2;
+
+            print(40 * 2 + foo)
+        "#;
+
+        let mut parser = Parser::new();
+
+        let program = parser.produce_ast(input.to_string());
         assert_eq!(program, expected);
     }
 }

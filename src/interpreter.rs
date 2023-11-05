@@ -1,4 +1,4 @@
-use std::collections::{HashMap};
+use std::collections::HashMap;
 
 use crate::{
     ast::{Property, Stmt},
@@ -12,6 +12,7 @@ pub fn evaluate(stmt: Stmt, env: &mut Environment) -> Result<RuntimeValue, EvalE
         Stmt::NumericLiteral(v) => Ok(RuntimeValue::Number(v)),
         Stmt::Identifier(v) => eval_identifier(v, env),
         Stmt::ObjectLiteral(properties) => eval_object_expr(properties, env),
+        Stmt::CallExpr { args, caller } => eval_call_expr(args, *caller, env),
         Stmt::AssignmentExpr { assignee, value } => eval_assignment_expr(*assignee, *value, env),
         Stmt::VarDeclaration {
             constant,
@@ -25,6 +26,24 @@ pub fn evaluate(stmt: Stmt, env: &mut Environment) -> Result<RuntimeValue, EvalE
         } => evaluate_binary_expr(*left, *right, operator, env),
         Stmt::Program(program) => eval_program(program, env),
         _ => panic!("AST Node has not been set up. \n{stmt:?}"),
+    }
+}
+
+fn eval_call_expr(
+    args: Vec<Stmt>,
+    caller: Stmt,
+    env: &mut Environment,
+) -> Result<RuntimeValue, EvalError> {
+    let args = args
+        .iter()
+        .map(|arg| evaluate(arg.to_owned(), env).expect("Cannot evaludate argument {arg:?}"))
+        .collect::<Vec<_>>();
+
+    if let RuntimeValue::NativeFn(function) = evaluate(caller.to_owned(), env)? {
+        let result = function(args, env);
+        Ok(result)
+    } else {
+        Err(EvalError::ValueNotAFunction(caller))
     }
 }
 

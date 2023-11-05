@@ -1,3 +1,5 @@
+#![allow(unused)] // temp for development
+
 use std::{
     io::{stdin, stdout, Write},
     process::exit,
@@ -34,7 +36,7 @@ fn repl() {
         let program = parser.produce_ast(input);
 
         let result = evaluate(ast::Stmt::Program(program), &mut env);
-        println!("{:?}", result);
+        // println!("{:?}", result);
     }
 }
 
