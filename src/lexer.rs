@@ -1,4 +1,4 @@
-use std::{iter::Peekable, str::Chars};
+
 
 use crate::token::*;
 
@@ -12,7 +12,7 @@ impl Lexer {
         let mut src = src.chars().peekable();
 
         while let Some(c) = src.next() {
-            if (Self::is_skippable(c)) {
+            if Self::is_skippable(c) {
                 continue;
             }
 
@@ -30,12 +30,12 @@ impl Lexer {
                 ':' => Token::new(c.to_string(), TokenType::Colon),
                 ';' => Token::new(c.to_string(), TokenType::Semicolon),
                 _ => {
-                    if (Self::is_numeric(c)) {
+                    if Self::is_numeric(c) {
                         let mut num = String::new();
                         num.push(c);
 
                         while let Some(c) = src.peek() {
-                            if (!Self::is_numeric(*c)) {
+                            if !Self::is_numeric(*c) {
                                 break;
                             }
                             num.push(src.next().unwrap());
@@ -46,7 +46,7 @@ impl Lexer {
                         ident.push(c);
 
                         while let Some(c) = src.peek() {
-                            if (!Self::is_alpha(*c)) {
+                            if !Self::is_alpha(*c) {
                                 break;
                             }
                             ident.push(src.next().unwrap());
@@ -57,7 +57,7 @@ impl Lexer {
                         } else {
                             Token::new(ident, TokenType::Identifier)
                         }
-                    } else if (Self::is_skippable(c)) {
+                    } else if Self::is_skippable(c) {
                         continue;
                     } else {
                         panic!("Unexpected token ({c})");

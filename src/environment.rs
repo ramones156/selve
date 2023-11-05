@@ -44,11 +44,11 @@ impl Environment {
         value: RuntimeValue,
         constant: bool,
     ) -> Result<RuntimeValue, EnvError> {
-        if (self.variables.contains_key(name)) {
+        if self.variables.contains_key(name) {
             return Err(EnvError::RedeclareVariable(name.to_string()));
         }
 
-        if (constant) {
+        if constant {
             self.constants.insert(name.to_owned());
         }
 
@@ -61,9 +61,9 @@ impl Environment {
         name: &str,
         value: RuntimeValue,
     ) -> Result<RuntimeValue, EnvError> {
-        let mut env = self.resolve(name)?;
+        let env = self.resolve(name)?;
 
-        if (env.constants.contains(name)) {
+        if env.constants.contains(name) {
             return Err(EnvError::ReassignVariable(name.to_string()));
         }
 
@@ -72,7 +72,7 @@ impl Environment {
     }
 
     pub fn lookup_var(&mut self, name: &str) -> Result<RuntimeValue, EnvError> {
-        let mut env = self.resolve(name)?;
+        let env = self.resolve(name)?;
         let value = env
             .variables
             .get(name)
@@ -81,11 +81,11 @@ impl Environment {
     }
 
     pub fn resolve(&mut self, name: &str) -> Result<&mut Environment, EnvError> {
-        if (self.variables.contains_key(name)) {
+        if self.variables.contains_key(name) {
             return Ok(self);
         }
 
-        if (self.parent.is_none()) {
+        if self.parent.is_none() {
             return Err(EnvError::VariableNotFound(name.to_string()));
         }
 

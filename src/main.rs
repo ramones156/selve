@@ -27,7 +27,7 @@ fn repl() {
     loop {
         let input = prompt();
 
-        if (input.is_empty() || input == "exit") {
+        if input.is_empty() || input == "exit" {
             exit(1);
         }
 

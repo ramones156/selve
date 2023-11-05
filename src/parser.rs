@@ -35,7 +35,7 @@ impl Parser {
 
     fn parse_stmt(&mut self) -> Stmt {
         if let Some(t) = self.peek() {
-            return match (t.token_type) {
+            return match t.token_type {
                 TokenType::LetKeyword | TokenType::ConstKeyword => {
                     self.parse_variable_declaration()
                 }
@@ -69,7 +69,7 @@ impl Parser {
         let mut left = self.parse_multiplicative_expr();
 
         while let Some(t) = self.peek() {
-            if (t.value != "+" && t.value != "-") {
+            if t.value != "+" && t.value != "-" {
                 break;
             }
 
@@ -91,7 +91,7 @@ impl Parser {
         let mut left = self.parse_call_member_expr();
 
         while let Some(t) = self.peek() {
-            if (t.value != "*" && t.value != "/" && t.value != "%") {
+            if t.value != "*" && t.value != "/" && t.value != "%" {
                 break;
             }
 
@@ -137,9 +137,9 @@ impl Parser {
                 )
                 .value;
             if let Some(t) = self.peek() {
-                if (t.token_type == TokenType::Semicolon) {
+                if t.token_type == TokenType::Semicolon {
                     self.eat();
-                    if (constant) {
+                    if constant {
                         panic!("A value is required for const assignment");
                     }
 
@@ -176,7 +176,7 @@ impl Parser {
 
     fn expect(&mut self, token_type: TokenType, err: &str) -> Token {
         if let Some(t) = self.eat() {
-            if (t.token_type != token_type) {
+            if t.token_type != token_type {
                 panic!("{err}");
             }
             t
@@ -188,7 +188,7 @@ impl Parser {
     /// { foo: foo, bar, baz: null }
     fn parse_object_expr(&mut self) -> Stmt {
         if let Some(t) = self.peek() {
-            if (t.token_type != TokenType::LeftBrace) {
+            if t.token_type != TokenType::LeftBrace {
                 return self.parse_additive_expr();
             }
 
@@ -196,7 +196,7 @@ impl Parser {
             let mut properties = vec![];
 
             while let Some(t) = self.peek() {
-                if (t.token_type == TokenType::RightBrace || t.token_type == TokenType::Eof) {
+                if t.token_type == TokenType::RightBrace || t.token_type == TokenType::Eof {
                     break;
                 }
 
@@ -205,12 +205,12 @@ impl Parser {
                     .value;
 
                 if let Some(t) = self.peek() {
-                    if (t.token_type == TokenType::Comma) {
+                    if t.token_type == TokenType::Comma {
                         // pair -> { key }
                         self.eat();
                         properties.push(Property { key, value: None });
                         continue;
-                    } else if (t.token_type == TokenType::RightBrace) {
+                    } else if t.token_type == TokenType::RightBrace {
                         // pair -> { key, }
                         properties.push(Property { key, value: None });
                         continue;
@@ -293,7 +293,7 @@ impl Parser {
         let mut args = vec![self.parse_expr()];
 
         while let Some(t) = self.peek() {
-            if (t.token_type != TokenType::Comma || self.eat().is_none()) {
+            if t.token_type != TokenType::Comma || self.eat().is_none() {
                 break;
             }
             args.push(self.parse_assignment_expr());
@@ -306,12 +306,12 @@ impl Parser {
         let mut object = self.parse_primary_expr();
 
         while let Some(t) = self.peek() {
-            if (t.token_type != TokenType::Dot && t.token_type != TokenType::LeftBracket) {
+            if t.token_type != TokenType::Dot && t.token_type != TokenType::LeftBracket {
                 break;
             }
 
-            let mut computed;
-            let mut property;
+            let computed;
+            let property;
 
             if let Some(operator) = self.peek() {
                 if operator.token_type == TokenType::Dot {

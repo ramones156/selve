@@ -1,4 +1,4 @@
-use std::collections::{btree_map::Values, HashMap};
+use std::collections::{HashMap};
 
 use crate::{
     ast::{Property, Stmt},
@@ -8,7 +8,7 @@ use crate::{
 };
 
 pub fn evaluate(stmt: Stmt, env: &mut Environment) -> Result<RuntimeValue, EvalError> {
-    match (stmt) {
+    match stmt {
         Stmt::NumericLiteral(v) => Ok(RuntimeValue::Number(v)),
         Stmt::Identifier(v) => eval_identifier(v, env),
         Stmt::ObjectLiteral(properties) => eval_object_expr(properties, env),
