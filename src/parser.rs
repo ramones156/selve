@@ -2,6 +2,7 @@ use std::iter::Peekable;
 use std::vec::IntoIter;
 
 use crate::ast::*;
+use crate::error::ParseError;
 use crate::lexer::*;
 use crate::token::*;
 
@@ -17,7 +18,7 @@ impl Parser {
         }
     }
 
-    pub fn produce_ast(&mut self, src: String) -> Program {
+    pub fn produce_ast(&mut self, src: String) -> Result<Program, ParseError> {
         self.tokens = Lexer::tokenize(src).into_iter().peekable();
 
         let mut program = Program { body: vec![] };
@@ -27,13 +28,13 @@ impl Parser {
                 break;
             }
 
-            program.body.push(self.parse_stmt());
+            program.body.push(self.parse_stmt()?);
         }
 
-        program
+        Ok(program)
     }
 
-    fn parse_stmt(&mut self) -> Stmt {
+    fn parse_stmt(&mut self) -> Result<Stmt, ParseError> {
         if let Some(t) = self.peek() {
             return match t.token_type {
                 TokenType::LetKeyword | TokenType::ConstKeyword => {
@@ -45,28 +46,28 @@ impl Parser {
         panic!("Statement not completed");
     }
 
-    fn parse_expr(&mut self) -> Stmt {
+    fn parse_expr(&mut self) -> Result<Stmt, ParseError> {
         self.parse_assignment_expr()
     }
 
-    fn parse_assignment_expr(&mut self) -> Stmt {
-        let left = self.parse_object_expr();
+    fn parse_assignment_expr(&mut self) -> Result<Stmt, ParseError> {
+        let left = self.parse_object_expr()?;
         if let Some(t) = self.peek() {
             if t.token_type == TokenType::Equals {
                 self.eat();
-                let value = self.parse_assignment_expr();
-                return Stmt::AssignmentExpr {
+                let value = self.parse_assignment_expr()?;
+                return Ok(Stmt::AssignmentExpr {
                     assignee: Box::new(left),
                     value: Box::new(value),
-                };
+                });
             }
         }
 
-        left
+        Ok(left)
     }
 
-    fn parse_additive_expr(&mut self) -> Stmt {
-        let mut left = self.parse_multiplicative_expr();
+    fn parse_additive_expr(&mut self) -> Result<Stmt, ParseError> {
+        let mut left = self.parse_multiplicative_expr()?;
 
         while let Some(t) = self.peek() {
             if t.value != "+" && t.value != "-" {
@@ -75,7 +76,7 @@ impl Parser {
 
             if let Some(tr) = self.eat() {
                 let operator = tr.value;
-                let right = self.parse_multiplicative_expr();
+                let right = self.parse_multiplicative_expr()?;
                 left = Stmt::BinaryExpr {
                     left: Box::new(left),
                     right: Box::new(right),
@@ -84,11 +85,11 @@ impl Parser {
             }
         }
 
-        left
+        Ok(left)
     }
 
-    fn parse_multiplicative_expr(&mut self) -> Stmt {
-        let mut left = self.parse_call_member_expr();
+    fn parse_multiplicative_expr(&mut self) -> Result<Stmt, ParseError> {
+        let mut left = self.parse_call_member_expr()?;
 
         while let Some(t) = self.peek() {
             if t.value != "*" && t.value != "/" && t.value != "%" {
@@ -97,7 +98,7 @@ impl Parser {
 
             if let Some(tr) = self.eat() {
                 let operator = tr.value;
-                let right = self.parse_call_member_expr();
+                let right = self.parse_call_member_expr()?;
                 left = Stmt::BinaryExpr {
                     left: Box::new(left),
                     right: Box::new(right),
@@ -106,35 +107,35 @@ impl Parser {
             }
         }
 
-        left
+        Ok(left)
     }
 
-    fn parse_primary_expr(&mut self) -> Stmt {
+    fn parse_primary_expr(&mut self) -> Result<Stmt, ParseError> {
         if let Some(t) = self.eat() {
             match t.token_type {
-                TokenType::Identifier => Stmt::Identifier(t.value.to_owned()),
-                TokenType::Number => Stmt::NumericLiteral(t.value.to_owned()),
+                TokenType::Identifier => Ok(Stmt::Identifier(t.value.to_owned())),
+                TokenType::Number => Ok(Stmt::NumericLiteral(t.value.to_owned())),
                 TokenType::LeftParen => {
-                    let value = self.parse_expr();
+                    let value = self.parse_expr()?;
                     self.expect(TokenType::RightParen, "No right paren inside expression");
 
-                    value
+                    Ok(value)
                 }
-                _ => panic!("Unsupported token {t:?}"),
+                _ => Err(ParseError::UnsupportedTokenType(t.token_type)),
             }
         } else {
             panic!("No token found inside expr");
         }
     }
 
-    fn parse_variable_declaration(&mut self) -> Stmt {
+    fn parse_variable_declaration(&mut self) -> Result<Stmt,ParseError> {
         if let Some(t) = self.eat() {
             let constant = t.token_type == TokenType::ConstKeyword;
             let identifier = self
                 .expect(
                     TokenType::Identifier,
                     "Expected identifier name after let or const keyword",
-                )
+                )?
                 .value;
             if let Some(t) = self.peek() {
                 if t.token_type == TokenType::Semicolon {
@@ -143,23 +144,23 @@ impl Parser {
                         panic!("A value is required for const assignment");
                     }
 
-                    return Stmt::VarDeclaration {
+                    return Ok(Stmt::VarDeclaration {
                         constant,
                         identifier,
                         value: None,
-                    };
+                    });
                 }
 
                 self.expect(TokenType::Equals, "Expected equals token after identifier");
                 let declaration = Stmt::VarDeclaration {
                     constant,
                     identifier,
-                    value: Some(Box::new(self.parse_expr())),
+                    value: Some(Box::new(self.parse_expr()?)),
                 };
 
                 self.expect(TokenType::Semicolon, "Expected semicolon after expression");
 
-                return declaration;
+                return Ok(declaration);
             }
         }
 
@@ -174,19 +175,19 @@ impl Parser {
         self.tokens.next()
     }
 
-    fn expect(&mut self, token_type: TokenType, err: &str) -> Token {
+    fn expect(&mut self, token_type: TokenType, err: &str) -> Result<Token, ParseError> {
         if let Some(t) = self.eat() {
             if t.token_type != token_type {
-                panic!("{err}");
+                return Err(ParseError::ExpectedCharacter(err.to_owned()));
             }
-            t
+            Ok(t)
         } else {
-            panic!("No token found after consuming");
+                return Err(ParseError::ExpectedToken);
         }
     }
 
     /// { foo: foo, bar, baz: null }
-    fn parse_object_expr(&mut self) -> Stmt {
+    fn parse_object_expr(&mut self) -> Result<Stmt,ParseError> {
         if let Some(t) = self.peek() {
             if t.token_type != TokenType::LeftBrace {
                 return self.parse_additive_expr();
@@ -201,7 +202,7 @@ impl Parser {
                 }
 
                 let key = self
-                    .expect(TokenType::Identifier, "Object literal identifier expected")
+                    .expect(TokenType::Identifier, "Object literal identifier expected")?
                     .value;
 
                 if let Some(t) = self.peek() {
@@ -221,7 +222,7 @@ impl Parser {
                         "Missing colon after identifier in object expression",
                     );
 
-                    let value = self.parse_expr();
+                    let value = self.parse_expr()?;
                     properties.push(Property {
                         key,
                         value: Some(Box::new(value)),
@@ -241,14 +242,14 @@ impl Parser {
                 TokenType::RightBrace,
                 "Object literal is missing a closing brace",
             );
-            return Stmt::ObjectLiteral(properties);
+            return Ok(Stmt::ObjectLiteral(properties));
         }
 
         panic!("Object literal cannot be parsed");
     }
 
-    fn parse_call_member_expr(&mut self) -> Stmt {
-        let member = self.parse_member_expr();
+    fn parse_call_member_expr(&mut self) -> Result<Stmt, ParseError> {
+        let member = self.parse_member_expr()?;
 
         if let Some(t) = self.peek() {
             if t.token_type == TokenType::LeftParen {
@@ -256,55 +257,56 @@ impl Parser {
             }
         }
 
-        member
+        Ok(member)
     }
 
-    fn parse_call_expr(&mut self, caller: Stmt) -> Stmt {
+    fn parse_call_expr(&mut self, caller: Stmt) -> Result<Stmt, ParseError> {
         let mut call_expr = Stmt::CallExpr {
             caller: Box::new(caller),
-            args: self.parse_args(),
+            args: self.parse_args()?,
         };
 
         if let Some(t) = self.peek() {
             if t.token_type == TokenType::LeftParen {
-                call_expr = self.parse_call_expr(call_expr);
+                call_expr = self.parse_call_expr(call_expr)?;
             }
         }
 
-        call_expr
+        Ok(call_expr)
     }
 
-    fn parse_args(&mut self) -> Vec<Stmt> {
+    fn parse_args(&mut self) -> Result<Vec<Stmt>,ParseError> {
         self.expect(TokenType::LeftParen, "Expected open parenthesis");
         if let Some(t) = self.peek() {
             let args = if t.token_type == TokenType::RightParen {
                 vec![]
             } else {
-                self.parse_args_list()
+                self.parse_args_list()?
             };
-            self.expect(TokenType::RightParen, "Missing closing parenthesis");
-            return args;
+            self.expect(TokenType::RightParen, "Missing closing parenthesis")?;
+            self.expect(TokenType::Semicolon, "Missing semicolon after closing bracket")?;
+            return Ok(args);
         };
 
-        panic!("No token after argument tokens");
+        return Err(ParseError::ExpectedToken);
     }
 
-    fn parse_args_list(&mut self) -> Vec<Stmt> {
-        let mut args = vec![self.parse_assignment_expr()];
+    fn parse_args_list(&mut self) -> Result<Vec<Stmt>, ParseError> {
+        let mut args = vec![self.parse_assignment_expr()?];
 
         while let Some(t) = self.peek() {
             if t.token_type != TokenType::Comma || self.eat().is_none() {
                 break;
             }
 
-            args.push(self.parse_assignment_expr());
+            args.push(self.parse_assignment_expr()?);
         }
 
-        args
+        Ok(args)
     }
 
-    fn parse_member_expr(&mut self) -> Stmt {
-        let mut object = self.parse_primary_expr();
+    fn parse_member_expr(&mut self) -> Result<Stmt, ParseError> {
+        let mut object = self.parse_primary_expr()?;
 
         while let Some(t) = self.peek() {
             if t.token_type != TokenType::Dot && t.token_type != TokenType::LeftBracket {
@@ -316,20 +318,20 @@ impl Parser {
                 let property;
 
                 if operator.token_type == TokenType::Dot {
-                    property = self.parse_primary_expr();
+                    property = self.parse_primary_expr()?;
 
                     if let Stmt::Identifier(_) = property {
                         continue;
                     } else {
-                        panic!("Cannot use dot operator without rhs being an identifier");
+                        return Err(ParseError::NoDotOperatorWithoutRhsIdentifier);
                     }
                 } else {
                     computed = true;
-                    property = self.parse_expr();
+                    property = self.parse_expr()?;
                     self.expect(
                         TokenType::RightBracket,
                         "Missing closing bracket in computed member expression",
-                    );
+                    )?;
                 }
 
                 object = Stmt::MemberExpr {
@@ -340,7 +342,7 @@ impl Parser {
             }
         }
 
-        object
+        Ok(object)
     }
 }
 
@@ -351,10 +353,6 @@ mod tests {
 
     #[test]
     fn basic() {
-        let input = "45 + (foo + 4) % bar";
-        let mut parser = Parser::new();
-
-        let program = parser.produce_ast(input.to_owned());
         let expected = Program {
             body: vec![Stmt::BinaryExpr {
                 left: Box::new(Stmt::NumericLiteral("45".to_owned())),
@@ -370,6 +368,10 @@ mod tests {
                 operator: "+".to_owned(),
             }],
         };
+        let input = "45 + (foo + 4) % bar";
+        let mut parser = Parser::new();
+
+        let program = parser.produce_ast(input.to_owned()).expect("Unable to parse");
         assert_eq!(program, expected);
     }
 
@@ -422,13 +424,13 @@ mod tests {
                 foo,
                 baz: {
                     z: true,
-                }
+                },
             };
         "#;
 
         let mut parser = Parser::new();
 
-        let program = parser.produce_ast(input.to_string());
+        let program = parser.produce_ast(input.to_string()).expect("Unable to parse");
         assert_eq!(program, expected);
     }
 
@@ -463,12 +465,12 @@ mod tests {
         let input = r#"
             let foo = 50 / 2;
 
-            print(40 * 2 + foo)
+            print(40 * 2 + foo);
         "#;
 
         let mut parser = Parser::new();
 
-        let program = parser.produce_ast(input.to_string());
+        let program = parser.produce_ast(input.to_string()).expect("Unable to parse");
         assert_eq!(program, expected);
     }
 }

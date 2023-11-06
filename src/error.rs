@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::ast::Stmt;
+use crate::{ast::Stmt, token::TokenType};
 
 #[derive(Error, Debug, PartialEq)]
 pub enum EnvError {
@@ -22,4 +22,16 @@ pub enum EvalError {
     InvalidOperator(String),
     #[error("Value {0:?} is not a function")]
     ValueNotAFunction(Stmt),
+}
+
+#[derive(Error, Debug, PartialEq)]
+pub enum ParseError {
+    #[error("Expected {0} in statement")]
+    ExpectedCharacter(String),
+    #[error("Expected a token but it returned nothing")]
+    ExpectedToken,
+    #[error("Unsupported token {0:?}")]
+    UnsupportedTokenType(TokenType),
+    #[error("Cannot use dot operator without rhs being an identifier")]
+    NoDotOperatorWithoutRhsIdentifier,
 }

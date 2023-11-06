@@ -33,7 +33,7 @@ fn repl() {
             exit(1);
         }
 
-        let program = parser.produce_ast(input);
+        let program = parser.produce_ast(input).expect("Unable to parse");
 
         let result = evaluate(ast::Stmt::Program(program), &mut env);
         // println!("{:?}", result);
