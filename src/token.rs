@@ -15,7 +15,7 @@ impl Token {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TokenType {
-    // [a-zA-Z0-9]
+    // foo_bar
     Identifier,
 
     // 0-9

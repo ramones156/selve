@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 
+use anyhow::anyhow;
+
 use crate::{
     ast::{Property, Stmt},
     environment::Environment,
-    error::EvalError,
+    error::{EvalError, Result},
     values::RuntimeValue,
 };
 
-pub fn evaluate(stmt: Stmt, env: &mut Environment) -> Result<RuntimeValue, EvalError> {
+pub fn evaluate(stmt: Stmt, env: &mut Environment) -> Result<RuntimeValue> {
     match stmt {
         Stmt::NumericLiteral(v) => Ok(RuntimeValue::Number(v)),
         Stmt::Identifier(v) => eval_identifier(v, env),
@@ -29,11 +31,7 @@ pub fn evaluate(stmt: Stmt, env: &mut Environment) -> Result<RuntimeValue, EvalE
     }
 }
 
-fn eval_call_expr(
-    args: Vec<Stmt>,
-    caller: Stmt,
-    env: &mut Environment,
-) -> Result<RuntimeValue, EvalError> {
+fn eval_call_expr(args: Vec<Stmt>, caller: Stmt, env: &mut Environment) -> Result<RuntimeValue> {
     let args = args
         .iter()
         .map(|arg| evaluate(arg.to_owned(), env).expect("Cannot evaludate argument {arg:?}"))
@@ -43,14 +41,11 @@ fn eval_call_expr(
         let result = function(args, env);
         Ok(result)
     } else {
-        Err(EvalError::ValueNotAFunction(caller))
+        Err(anyhow!(EvalError::ValueNotAFunction(caller)))
     }
 }
 
-fn eval_program(
-    program: crate::ast::Program,
-    env: &mut Environment,
-) -> Result<RuntimeValue, EvalError> {
+fn eval_program(program: crate::ast::Program, env: &mut Environment) -> Result<RuntimeValue> {
     let mut last_evaluated = RuntimeValue::Null;
 
     for statement in program.body {
@@ -68,7 +63,7 @@ fn eval_program(
 fn eval_object_expr(
     object_properties: Vec<Property>,
     env: &mut Environment,
-) -> Result<RuntimeValue, EvalError> {
+) -> Result<RuntimeValue> {
     let mut properties = HashMap::new();
     for property in object_properties {
         let Property { key, value } = property;
@@ -79,7 +74,7 @@ fn eval_object_expr(
             match env.lookup_var(&key) {
                 Ok(v) => v,
                 Err(e) => {
-                    return Err(EvalError::EnvError(e));
+                    return Err(anyhow!(e));
                 }
             }
         };
@@ -94,17 +89,17 @@ fn eval_assignment_expr(
     assignee: Stmt,
     value: Stmt,
     env: &mut Environment,
-) -> Result<RuntimeValue, EvalError> {
+) -> Result<RuntimeValue> {
     if let Stmt::Identifier(name) = assignee {
         let value = evaluate(value, env)?;
 
         return match env.assign_var(&name, value) {
             Ok(v) => Ok(v),
-            Err(e) => Err(EvalError::EnvError(e)),
+            Err(e) => Err(anyhow!(e)),
         };
     }
 
-    Err(EvalError::InvalidAssignment)
+    Err(anyhow!(EvalError::InvalidAssignment))
 }
 
 fn eval_variable_declaration(
@@ -112,7 +107,7 @@ fn eval_variable_declaration(
     identifier: String,
     value: Option<Box<Stmt>>,
     env: &mut Environment,
-) -> Result<RuntimeValue, EvalError> {
+) -> Result<RuntimeValue> {
     let runtime_value = if let Some(value) = value {
         evaluate(*value, env)?
     } else {
@@ -121,14 +116,14 @@ fn eval_variable_declaration(
 
     match env.declare_var(&identifier, runtime_value, constant) {
         Ok(v) => Ok(v),
-        Err(e) => Err(EvalError::EnvError(e)),
+        Err(e) => Err(anyhow!(e)),
     }
 }
 
-fn eval_identifier(v: String, env: &mut Environment) -> Result<RuntimeValue, EvalError> {
+fn eval_identifier(v: String, env: &mut Environment) -> Result<RuntimeValue> {
     match env.lookup_var(&v) {
         Ok(v) => Ok(v),
-        Err(e) => Err(EvalError::EnvError(e)),
+        Err(e) => Err(anyhow!(e)),
     }
 }
 
@@ -137,7 +132,7 @@ fn evaluate_binary_expr(
     right: Stmt,
     operator: String,
     env: &mut Environment,
-) -> Result<RuntimeValue, EvalError> {
+) -> Result<RuntimeValue> {
     if let RuntimeValue::Number(lhs) = evaluate(left, env)? {
         if let RuntimeValue::Number(rhs) = evaluate(right, env)? {
             return eval_numeric_binary_expr(lhs, rhs, operator);
@@ -147,11 +142,7 @@ fn evaluate_binary_expr(
     Ok(RuntimeValue::Null)
 }
 
-fn eval_numeric_binary_expr(
-    lhs: String,
-    rhs: String,
-    operator: String,
-) -> Result<RuntimeValue, EvalError> {
+fn eval_numeric_binary_expr(lhs: String, rhs: String, operator: String) -> Result<RuntimeValue> {
     let lhs = lhs.parse::<i64>().unwrap();
     let rhs = rhs.parse::<i64>().unwrap();
 
@@ -162,7 +153,7 @@ fn eval_numeric_binary_expr(
         "/" => lhs / rhs,
         "%" => lhs % rhs,
         _ => {
-            return Err(EvalError::InvalidOperator(operator));
+            return Err(anyhow!(EvalError::InvalidOperator(operator)));
         }
     };
 

@@ -2,6 +2,8 @@ use thiserror::Error;
 
 use crate::{ast::Stmt, token::TokenType};
 
+pub type Result<T> = anyhow::Result<T>;
+
 #[derive(Error, Debug, PartialEq)]
 pub enum EnvError {
     #[error("Cannot redeclare variable {0}")]
@@ -14,8 +16,6 @@ pub enum EnvError {
 
 #[derive(Error, Debug, PartialEq)]
 pub enum EvalError {
-    #[error("Env error: {0:?}")]
-    EnvError(EnvError),
     #[error("Invalid assignment")]
     InvalidAssignment,
     #[error("Unsupported binary operator {0}")]
@@ -34,4 +34,10 @@ pub enum ParseError {
     UnsupportedTokenType(TokenType),
     #[error("Cannot use dot operator without rhs being an identifier")]
     NoDotOperatorWithoutRhsIdentifier,
+}
+
+#[derive(Error, Debug, PartialEq)]
+pub enum LexerError {
+    #[error("Unexpected character {0}")]
+    UnexpectedCharacter(char),
 }

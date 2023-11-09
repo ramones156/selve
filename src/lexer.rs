@@ -1,9 +1,9 @@
-use crate::token::*;
+use crate::{error::LexerError, token::*};
 
 pub struct Lexer;
 
 impl Lexer {
-    pub fn tokenize(src: impl Into<String>) -> Vec<Token> {
+    pub fn tokenize(src: impl Into<String>) -> Result<Vec<Token>, LexerError> {
         let mut tokens = vec![];
         let src: String = src.into();
 
@@ -58,7 +58,7 @@ impl Lexer {
                     } else if Self::is_skippable(c) {
                         continue;
                     } else {
-                        panic!("Unexpected token ({c})");
+                        return Err(LexerError::UnexpectedCharacter(c));
                     }
                 }
             };
@@ -67,7 +67,7 @@ impl Lexer {
         }
 
         tokens.push(Token::new("", TokenType::Eof));
-        tokens
+        Ok(tokens)
     }
 
     fn is_alpha(c: char) -> bool {
@@ -105,7 +105,7 @@ mod tests {
     fn basic() {
         let src = r#"let x  = 5 + (4 / 3);"#;
 
-        let tokens = Lexer::tokenize(src);
+        let tokens = Lexer::tokenize(src).expect("Couldnt tokenize input");
 
         assert(&tokens[0], "let", TokenType::LetKeyword);
         assert(&tokens[1], "x", TokenType::Identifier);
