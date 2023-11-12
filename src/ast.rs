@@ -1,9 +1,17 @@
+use crate::environment::Environment;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
     Program(Program),
     ObjectLiteral(Vec<Property>),
     NumericLiteral(String),
     Identifier(String),
+    FnDeclaration {
+        name: String,
+        parameters: Vec<String>,
+        body: Vec<Stmt>,
+        is_const: bool,
+    },
     VarDeclaration {
         constant: bool,
         identifier: String,

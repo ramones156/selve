@@ -44,7 +44,7 @@ impl Lexer {
                         ident.push(c);
 
                         while let Some(c) = src.peek() {
-                            if !Self::is_alpha(*c) {
+                            if !Self::is_ident_compliant(*c) {
                                 break;
                             }
                             ident.push(src.next().unwrap());
@@ -68,6 +68,10 @@ impl Lexer {
 
         tokens.push(Token::new("", TokenType::Eof));
         Ok(tokens)
+    }
+
+    fn is_ident_compliant(c: char) -> bool {
+        Self::is_alpha(c) || c == '_'
     }
 
     fn is_alpha(c: char) -> bool {

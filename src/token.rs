@@ -90,6 +90,7 @@ impl TokenType {
         let token_type = match keyword {
             "let" => TokenType::LetKeyword,
             "const" => TokenType::ConstKeyword,
+            "fn" => TokenType::FnKeyword,
             _ => {
                 return None;
             }

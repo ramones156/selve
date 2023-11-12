@@ -43,6 +43,7 @@ impl Parser {
                 TokenType::LetKeyword | TokenType::ConstKeyword => {
                     self.parse_variable_declaration()
                 }
+                TokenType::FnKeyword => self.parse_function_declaration(),
                 _ => self.parse_expr(),
             };
         }
@@ -170,6 +171,51 @@ impl Parser {
         panic!("Cannot parse variable declaration");
     }
 
+    fn parse_function_declaration(&mut self) -> Result<Stmt> {
+        self.eat();
+        let name = self
+            .expect(
+                TokenType::Identifier,
+                "Expected function name following fn keyword",
+            )?
+            .value;
+
+        let args = self.parse_args()?;
+
+        let mut parameters = vec![];
+        for arg in args {
+            if let Stmt::Identifier(v) = arg {
+                parameters.push(v);
+            } else {
+                return Err(anyhow!(ParseError::ExpectedParameterToBeString(arg)));
+            }
+        }
+
+        self.expect(
+            TokenType::LeftBrace,
+            "Expected function body following declaration",
+        );
+
+        let mut body = vec![];
+        while let Some(t) = self.peek() {
+            if t.token_type == TokenType::Eof || t.token_type == TokenType::RightBrace {
+                break;
+            }
+
+            body.push(self.parse_stmt()?);
+        }
+
+        self.expect(TokenType::RightBrace, "Closing bracket expected");
+
+        let function = Stmt::FnDeclaration {
+            name,
+            parameters,
+            body,
+            is_const: false,
+        };
+        Ok(function)
+    }
+
     fn peek(&mut self) -> Option<&Token> {
         self.tokens.peek()
     }
@@ -181,7 +227,11 @@ impl Parser {
     fn expect(&mut self, token_type: TokenType, err: &str) -> Result<Token> {
         if let Some(t) = self.eat() {
             if t.token_type != token_type {
-                return Err(anyhow!(ParseError::ExpectedCharacter(err.to_owned())));
+                return Err(anyhow!(ParseError::ExpectedCharacter(
+                    token_type,
+                    t.token_type,
+                    err.to_owned()
+                )));
             }
             Ok(t)
         } else {
@@ -263,6 +313,8 @@ impl Parser {
         Ok(member)
     }
 
+    /// foo(...args);
+    /// ^...........^
     fn parse_call_expr(&mut self, caller: Stmt) -> Result<Stmt> {
         let mut call_expr = Stmt::CallExpr {
             caller: Box::new(caller),
@@ -278,19 +330,18 @@ impl Parser {
         Ok(call_expr)
     }
 
+    /// foo(...args);
+    ///     ^.....^
     fn parse_args(&mut self) -> Result<Vec<Stmt>> {
         self.expect(TokenType::LeftParen, "Expected open parenthesis");
         if let Some(t) = self.peek() {
             let args = if t.token_type == TokenType::RightParen {
-                vec![]
+                vec![] // args list is empty
             } else {
                 self.parse_args_list()?
             };
+             
             self.expect(TokenType::RightParen, "Missing closing parenthesis")?;
-            self.expect(
-                TokenType::Semicolon,
-                "Missing semicolon after closing bracket",
-            )?;
             return Ok(args);
         };
 
@@ -355,7 +406,7 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::Stmt::AssignmentExpr;
+    use crate::parser::Stmt::{AssignmentExpr, FnDeclaration};
 
     #[test]
     fn basic() {
@@ -434,6 +485,61 @@ mod tests {
                     z: true,
                 },
             };
+        "#;
+
+        let mut parser = Parser::new();
+
+        let program = parser
+            .produce_ast(input.to_string())
+            .expect("Unable to parse");
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn declare_function() {
+        let expected = Program {
+            body: vec![FnDeclaration {
+                name: "add".to_owned(),
+                parameters: vec!["x".to_owned(), "y".to_owned()],
+                body: vec![
+                    Stmt::FnDeclaration {
+                        name: "subtract".to_owned(),
+                        parameters: vec![],
+                        body: vec![Stmt::CallExpr {
+                            args: vec![],
+                            caller: Box::new(Stmt::Identifier("print".to_owned())),
+                        }],
+                        is_const: false,
+                    },
+                    Stmt::VarDeclaration {
+                        constant: false,
+                        identifier: "result".to_string(),
+                        value: Some(Box::new(Stmt::BinaryExpr {
+                            left: Box::new(Stmt::Identifier("x".to_owned())),
+                            right: Box::new(Stmt::Identifier("y".to_owned())),
+                            operator: "+".to_owned(),
+                        })),
+                    },
+                    Stmt::CallExpr {
+                        args: vec![Stmt::Identifier("result".to_owned())],
+                        caller: Box::new(Stmt::Identifier("print".to_owned())),
+                    },
+                    Stmt::Identifier("result".to_owned()),
+                ],
+                is_const: false,
+            }],
+        };
+
+        let input = r#"
+            fn add(x,y) {
+                fn subtract() {
+                    print();
+                }
+                let result = x + y;
+                print(result);
+
+                result
+            }
         "#;
 
         let mut parser = Parser::new();

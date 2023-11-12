@@ -1,14 +1,15 @@
+use anyhow::anyhow;
 use std::{
     collections::{HashMap, HashSet},
     time::SystemTime,
 };
 
 use crate::{
-    error::EnvError,
+    error::{EnvError, Result},
     values::{self, RuntimeValue},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Environment {
     parent: Option<Box<Environment>>,
     variables: HashMap<String, RuntimeValue>,
@@ -64,9 +65,9 @@ impl Environment {
         name: &str,
         value: RuntimeValue,
         constant: bool,
-    ) -> Result<RuntimeValue, EnvError> {
+    ) -> Result<RuntimeValue> {
         if self.variables.contains_key(name) {
-            return Err(EnvError::RedeclareVariable(name.to_string()));
+            return Err(anyhow!(EnvError::RedeclareVariable(name.to_string())));
         }
 
         if constant {
@@ -77,22 +78,18 @@ impl Environment {
         Ok(value)
     }
 
-    pub fn assign_var(
-        &mut self,
-        name: &str,
-        value: RuntimeValue,
-    ) -> Result<RuntimeValue, EnvError> {
+    pub fn assign_var(&mut self, name: &str, value: RuntimeValue) -> Result<RuntimeValue> {
         let env = self.resolve(name)?;
 
         if env.constants.contains(name) {
-            return Err(EnvError::ReassignVariable(name.to_string()));
+            return Err(anyhow!(EnvError::ReassignVariable(name.to_string())));
         }
 
         env.variables.insert(name.to_owned(), value.clone());
         Ok(value)
     }
 
-    pub fn lookup_var(&mut self, name: &str) -> Result<RuntimeValue, EnvError> {
+    pub fn lookup_var(&mut self, name: &str) -> Result<RuntimeValue> {
         let env = self.resolve(name)?;
         let value = env
             .variables
@@ -101,13 +98,13 @@ impl Environment {
         Ok(value.clone())
     }
 
-    pub fn resolve(&mut self, name: &str) -> Result<&mut Environment, EnvError> {
+    pub fn resolve(&mut self, name: &str) -> Result<&mut Environment> {
         if self.variables.contains_key(name) {
             return Ok(self);
         }
 
         if self.parent.is_none() {
-            return Err(EnvError::VariableNotFound(name.to_string()));
+            return Err(anyhow!(EnvError::VariableNotFound(name.to_string())));
         }
 
         self.parent.as_mut().unwrap().resolve(name)
@@ -128,8 +125,10 @@ mod tests {
         );
         assert_eq!(RuntimeValue::Null, env.lookup_var("null").unwrap());
         assert_eq!(
-            EnvError::VariableNotFound("foo".to_string()),
-            env.lookup_var("foo").expect_err("Should not be Ok()")
+            "Cannot resolve foo since it doesnt exist",
+            env.lookup_var("foo")
+                .expect_err("Should not be Ok()")
+                .to_string(),
         );
     }
 }

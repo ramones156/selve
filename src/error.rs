@@ -26,10 +26,12 @@ pub enum EvalError {
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ParseError {
-    #[error("Expected {0} in statement")]
-    ExpectedCharacter(String),
+    #[error("\nExpected {0:?} but got {1:?}.\n{2}")]
+    ExpectedCharacter(TokenType, TokenType, String),
     #[error("Expected a token but it returned nothing")]
     ExpectedToken,
+    #[error("Expected parameter type {0:?} to be of type string")]
+    ExpectedParameterToBeString(Stmt),
     #[error("Unsupported token {0:?}")]
     UnsupportedTokenType(TokenType),
     #[error("Cannot use dot operator without rhs being an identifier")]

@@ -16,6 +16,12 @@ pub fn evaluate(stmt: Stmt, env: &mut Environment) -> Result<RuntimeValue> {
         Stmt::ObjectLiteral(properties) => eval_object_expr(properties, env),
         Stmt::CallExpr { args, caller } => eval_call_expr(args, *caller, env),
         Stmt::AssignmentExpr { assignee, value } => eval_assignment_expr(*assignee, *value, env),
+        Stmt::FnDeclaration {
+            name,
+            parameters,
+            body,
+            is_const,
+        } => eval_function_declaration(name, parameters, body, is_const, env),
         Stmt::VarDeclaration {
             constant,
             identifier,
@@ -37,12 +43,35 @@ fn eval_call_expr(args: Vec<Stmt>, caller: Stmt, env: &mut Environment) -> Resul
         .map(|arg| evaluate(arg.to_owned(), env).expect("Cannot evaludate argument {arg:?}"))
         .collect::<Vec<_>>();
 
-    if let RuntimeValue::NativeFn(function) = evaluate(caller.to_owned(), env)? {
-        let result = function(args, env);
-        Ok(result)
-    } else {
-        Err(anyhow!(EvalError::ValueNotAFunction(caller)))
-    }
+    let call_expr = evaluate(caller.to_owned(), env)?;
+
+    return match call_expr {
+        RuntimeValue::NativeFn(function) => {
+            let result = function(args, env);
+            Ok(result)
+        }
+        RuntimeValue::Function {
+            name,
+            parameters,
+            declaration_env,
+            body,
+        } => {
+            let mut scope = Environment::with(declaration_env);
+
+            for (i, parameter) in parameters.iter().enumerate() {
+                scope.declare_var(parameter, args[i].clone(), false)?;
+            }
+
+            let mut result = RuntimeValue::Null;
+
+            for stmt in body {
+                result = evaluate(stmt, &mut scope)?;
+            }
+
+            Ok(result)
+        }
+        _ => Err(anyhow!(EvalError::ValueNotAFunction(caller))),
+    };
 }
 
 fn eval_program(program: crate::ast::Program, env: &mut Environment) -> Result<RuntimeValue> {
@@ -100,6 +129,23 @@ fn eval_assignment_expr(
     }
 
     Err(anyhow!(EvalError::InvalidAssignment))
+}
+
+fn eval_function_declaration(
+    name: String,
+    parameters: Vec<String>,
+    body: Vec<Stmt>,
+    is_const: bool,
+    env: &mut Environment,
+) -> Result<RuntimeValue> {
+    let function = RuntimeValue::Function {
+        name: name.clone(),
+        parameters,
+        declaration_env: env.clone(),
+        body,
+    };
+
+    env.declare_var(&name, function, true)
 }
 
 fn eval_variable_declaration(
