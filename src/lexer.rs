@@ -31,7 +31,7 @@ impl Lexer {
                                 match c2 {
                                     '/' => {
                                         // Single-line comment
-                                        while let Some(next_char) = src.next() {
+                                        for next_char in src.by_ref() {
                                             if next_char == '\n' {
                                                 break;
                                             }

@@ -65,8 +65,7 @@ impl Parser {
     }
 
     fn parse_expr(&mut self) -> Result<Stmt> {
-        let assignment = self.parse_assignment_expr();
-        assignment
+        self.parse_assignment_expr()
     }
 
     fn parse_assignment_expr(&mut self) -> Result<Stmt> {
