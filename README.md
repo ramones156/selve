@@ -19,9 +19,15 @@ struct Bar {
   bar: Foo,
 }
 
+fn do_print(int y) {
+    print(y);
+}
+
 fn main() {
 	let x  = Foo::Bar;
 	let y = Bar {foo: 0};
+    @y += 4;
+    do_print(y)
 }
-print(z);
+
 ```
