@@ -45,3 +45,9 @@ pub enum LexerError {
     #[error("Unexpected character {0}")]
     UnexpectedCharacter(char),
 }
+
+#[derive(Error, Debug, PartialEq)]
+pub enum InterpreterError {
+    #[error("Unexpected character {0:?}")]
+    UnexpectedStatement(Stmt),
+}

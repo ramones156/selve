@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use crate::{
     ast::{Property, Stmt},
     environment::Environment,
-    error::{EvalError, Result},
+    error::{EvalError, InterpreterError, Result},
     values::RuntimeValue,
 };
 
@@ -33,7 +33,7 @@ pub fn evaluate(stmt: Stmt, env: &mut Environment) -> Result<RuntimeValue> {
             operator,
         } => evaluate_binary_expr(*left, *right, operator, env),
         Stmt::Program(program) => eval_program(program, env),
-        _ => panic!("AST Node has not been set up. \n{stmt:?}"),
+        _ => Err(anyhow!(InterpreterError::UnexpectedStatement(stmt))),
     }
 }
 

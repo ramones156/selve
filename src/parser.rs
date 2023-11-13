@@ -50,7 +50,7 @@ impl Parser {
             self.expect(TokenType::Semicolon, "Expected semicolon after statement");
             return stmt;
         }
-        panic!("Statement not completed");
+        Err(anyhow!(ParseError::ExpectedToken))
     }
 
     fn parse_comment_declaration(&mut self) -> Result<Stmt> {
@@ -142,7 +142,7 @@ impl Parser {
                 _ => Err(anyhow!(ParseError::UnsupportedTokenType(t.token_type))),
             }
         } else {
-            panic!("No token found inside expr");
+            Err(anyhow!(ParseError::ExpectedToken))
         }
     }
 
@@ -311,7 +311,7 @@ impl Parser {
             return Ok(Stmt::ObjectLiteral(properties));
         }
 
-        panic!("Object literal cannot be parsed");
+        Err(anyhow!(ParseError::ExpectedToken))
     }
 
     fn parse_call_member_expr(&mut self) -> Result<Stmt> {
