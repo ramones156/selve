@@ -35,13 +35,13 @@ impl std::fmt::Display for RuntimeValue {
             }
             RuntimeValue::Function {
                 name,
-                parameters,
-                declaration_env,
-                body,
+                parameters: _,
+                declaration_env: _,
+                body: _,
             } => {
                 writeln!(f, "{}()", name);
             }
-            RuntimeValue::NativeFn(call) => {
+            RuntimeValue::NativeFn(_call) => {
                 writeln!(f, "FnCall");
             }
             RuntimeValue::Number(n) => {

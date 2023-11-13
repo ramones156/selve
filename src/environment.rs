@@ -1,7 +1,6 @@
 use anyhow::anyhow;
 use std::{
     collections::{HashMap, HashSet},
-    time::SystemTime,
 };
 
 use crate::{
@@ -36,7 +35,7 @@ impl Environment {
 
         fn print(
             args: Vec<values::RuntimeValue>,
-            environment: &mut Environment,
+            _environment: &mut Environment,
         ) -> values::RuntimeValue {
             args.iter().for_each(|arg| println!("{arg}"));
 
@@ -44,8 +43,8 @@ impl Environment {
         }
         self.declare_var("print", RuntimeValue::NativeFn(print), true);
         fn time(
-            args: Vec<values::RuntimeValue>,
-            environment: &mut Environment,
+            _args: Vec<values::RuntimeValue>,
+            _environment: &mut Environment,
         ) -> values::RuntimeValue {
             RuntimeValue::Number("Friday 13th".to_string())
         }

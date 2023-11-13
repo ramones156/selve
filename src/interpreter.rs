@@ -51,7 +51,7 @@ fn eval_call_expr(args: Vec<Stmt>, caller: Stmt, env: &mut Environment) -> Resul
             Ok(result)
         }
         RuntimeValue::Function {
-            name,
+            name: _,
             parameters,
             declaration_env,
             body,
@@ -135,7 +135,7 @@ fn eval_function_declaration(
     name: String,
     parameters: Vec<String>,
     body: Vec<Stmt>,
-    is_const: bool,
+    _is_const: bool,
     env: &mut Environment,
 ) -> Result<RuntimeValue> {
     let function = RuntimeValue::Function {
