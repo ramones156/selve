@@ -45,7 +45,7 @@ fn eval_call_expr(args: Vec<Stmt>, caller: Stmt, env: &mut Environment) -> Resul
 
     let call_expr = evaluate(caller.to_owned(), env)?;
 
-    return match call_expr {
+    match call_expr {
         RuntimeValue::NativeFn(function) => {
             let result = function(args, env);
             Ok(result)
@@ -71,7 +71,7 @@ fn eval_call_expr(args: Vec<Stmt>, caller: Stmt, env: &mut Environment) -> Resul
             Ok(result)
         }
         _ => Err(anyhow!(EvalError::ValueNotAFunction(caller))),
-    };
+    }
 }
 
 fn eval_program(program: crate::ast::Program, env: &mut Environment) -> Result<RuntimeValue> {

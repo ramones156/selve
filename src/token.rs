@@ -24,6 +24,9 @@ pub enum TokenType {
     // + - / * %
     BinaryOperator,
 
+    // Comment
+    Comment,
+
     // {
     LeftBrace,
 

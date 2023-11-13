@@ -36,6 +36,8 @@ pub enum ParseError {
     UnsupportedTokenType(TokenType),
     #[error("Cannot use dot operator without rhs being an identifier")]
     NoDotOperatorWithoutRhsIdentifier,
+    #[error("A value is required for const assignment")]
+    ConstValueRequired,
 }
 
 #[derive(Error, Debug, PartialEq)]

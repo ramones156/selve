@@ -21,7 +21,44 @@ impl Lexer {
                 '[' => Token::new(c.to_string(), TokenType::LeftBracket),
                 ']' => Token::new(c.to_string(), TokenType::RightBracket),
                 '}' => Token::new(c.to_string(), TokenType::RightBrace),
-                '+' | '-' | '/' | '*' | '%' => Token::new(c.to_string(), TokenType::BinaryOperator),
+                '/' => {
+                    if let Some(c2) = src.peek() {
+                        if *c2 != '/' && *c2 != '*' {
+                            Token::new(c.to_string(), TokenType::BinaryOperator)
+                        } else {
+                            let mut comment = String::new();
+                            if let Some(c2) = src.next() {
+                                match c2 {
+                                    '/' => {
+                                        // Single-line comment
+                                        while let Some(next_char) = src.next() {
+                                            if next_char == '\n' {
+                                                break;
+                                            }
+                                            comment.push(next_char);
+                                        }
+                                    }
+                                    '*' => {
+                                        // Multi-line comment
+                                        while let Some(next_char) = src.next() {
+                                            if next_char == '*' {
+                                                if let Some('/') = src.next() {
+                                                    break;
+                                                }
+                                                comment.push(next_char);
+                                            }
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            Token::new(comment, TokenType::Comment)
+                        }
+                    } else {
+                        Token::new(c.to_string(), TokenType::BinaryOperator)
+                    }
+                }
+                '+' | '-' | '*' | '%' => Token::new(c.to_string(), TokenType::BinaryOperator),
                 '=' => Token::new(c.to_string(), TokenType::Equals),
                 '.' => Token::new(c.to_string(), TokenType::Dot),
                 ',' => Token::new(c.to_string(), TokenType::Comma),

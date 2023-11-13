@@ -39,19 +39,34 @@ impl Parser {
 
     fn parse_stmt(&mut self) -> Result<Stmt> {
         if let Some(t) = self.peek() {
-            return match t.token_type {
+            let stmt = match t.token_type {
+                TokenType::Comment => self.parse_comment_declaration(),
                 TokenType::LetKeyword | TokenType::ConstKeyword => {
                     self.parse_variable_declaration()
                 }
                 TokenType::FnKeyword => self.parse_function_declaration(),
                 _ => self.parse_expr(),
             };
+            self.expect(TokenType::Semicolon, "Expected semicolon after statement");
+            return stmt;
         }
         panic!("Statement not completed");
     }
 
+    fn parse_comment_declaration(&mut self) -> Result<Stmt> {
+        if let Some(t) = self.peek() {
+            if let TokenType::Comment = t.token_type {
+                let comment = Stmt::Comment(t.value.to_owned());
+                return Ok(comment);
+            }
+        }
+
+        Err(anyhow!(ParseError::ExpectedToken))
+    }
+
     fn parse_expr(&mut self) -> Result<Stmt> {
-        self.parse_assignment_expr()
+        let assignment = self.parse_assignment_expr();
+        assignment
     }
 
     fn parse_assignment_expr(&mut self) -> Result<Stmt> {
@@ -145,7 +160,7 @@ impl Parser {
                 if t.token_type == TokenType::Semicolon {
                     self.eat();
                     if constant {
-                        panic!("A value is required for const assignment");
+                        return Err(anyhow!(ParseError::ConstValueRequired));
                     }
 
                     return Ok(Stmt::VarDeclaration {
@@ -162,13 +177,11 @@ impl Parser {
                     value: Some(Box::new(self.parse_expr()?)),
                 };
 
-                self.expect(TokenType::Semicolon, "Expected semicolon after expression");
-
                 return Ok(declaration);
             }
         }
 
-        panic!("Cannot parse variable declaration");
+        Err(anyhow!(ParseError::ExpectedToken))
     }
 
     fn parse_function_declaration(&mut self) -> Result<Stmt> {
@@ -295,6 +308,7 @@ impl Parser {
                 TokenType::RightBrace,
                 "Object literal is missing a closing brace",
             );
+
             return Ok(Stmt::ObjectLiteral(properties));
         }
 
@@ -313,8 +327,8 @@ impl Parser {
         Ok(member)
     }
 
-    /// foo(...args);
-    /// ^...........^
+    /// foo(...args)
+    /// ^..........^
     fn parse_call_expr(&mut self, caller: Stmt) -> Result<Stmt> {
         let mut call_expr = Stmt::CallExpr {
             caller: Box::new(caller),
@@ -326,11 +340,10 @@ impl Parser {
                 call_expr = self.parse_call_expr(call_expr)?;
             }
         }
-
         Ok(call_expr)
     }
 
-    /// foo(...args);
+    /// foo(...args)
     ///     ^.....^
     fn parse_args(&mut self) -> Result<Vec<Stmt>> {
         self.expect(TokenType::LeftParen, "Expected open parenthesis");
@@ -340,8 +353,13 @@ impl Parser {
             } else {
                 self.parse_args_list()?
             };
-             
-            self.expect(TokenType::RightParen, "Missing closing parenthesis")?;
+
+            // TODO for nested function parse args takes both parens
+            self.expect(
+                TokenType::RightParen,
+                "Missing closing parenthesis in argument list",
+            )?;
+
             return Ok(args);
         };
 
@@ -511,14 +529,13 @@ mod tests {
                         }],
                         is_const: false,
                     },
-                    Stmt::VarDeclaration {
-                        constant: false,
-                        identifier: "result".to_string(),
-                        value: Some(Box::new(Stmt::BinaryExpr {
+                    AssignmentExpr {
+                        assignee: Box::new(Stmt::Identifier("result".to_owned())),
+                        value: Box::new(Stmt::BinaryExpr {
                             left: Box::new(Stmt::Identifier("x".to_owned())),
                             right: Box::new(Stmt::Identifier("y".to_owned())),
                             operator: "+".to_owned(),
-                        })),
+                        }),
                     },
                     Stmt::CallExpr {
                         args: vec![Stmt::Identifier("result".to_owned())],
@@ -535,11 +552,59 @@ mod tests {
                 fn subtract() {
                     print();
                 }
-                let result = x + y;
-                print(result);
 
+                let result = x + y;
+                
+                print(result);
                 result
             }
+        "#;
+
+        let mut parser = Parser::new();
+
+        let program = parser
+            .produce_ast(input.to_string())
+            .expect("Unable to parse");
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn comment() {
+        let expected = Program {
+            body: vec![
+                Stmt::Comment(" this is a comment!".to_owned()),
+                Stmt::VarDeclaration {
+                    constant: false,
+                    identifier: "foo".to_owned(),
+                    value: Some(Box::new(Stmt::BinaryExpr {
+                        left: Box::new(Stmt::NumericLiteral("50".to_owned())),
+                        right: Box::new(Stmt::NumericLiteral("2".to_owned())),
+                        operator: "/".to_owned(),
+                    })),
+                },
+                Stmt::Comment(" this does stuff".to_owned()),
+                Stmt::CallExpr {
+                    args: vec![Stmt::BinaryExpr {
+                        left: Box::new(Stmt::BinaryExpr {
+                            left: Box::new(Stmt::NumericLiteral("40".to_owned())),
+                            right: Box::new(Stmt::NumericLiteral("2".to_owned())),
+                            operator: "*".to_owned(),
+                        }),
+                        right: Box::new(Stmt::Identifier("foo".to_owned())),
+                        operator: "+".to_owned(),
+                    }],
+                    caller: Box::new(Stmt::Identifier("print".to_owned())),
+                },
+                Stmt::Comment(" so does this!".to_owned()),
+            ],
+        };
+
+        let input = r#"
+            // this is a comment!
+            let foo = 50 / 2;
+
+            // this does stuff
+            print(40 * 2 + foo); // so does this!
         "#;
 
         let mut parser = Parser::new();
@@ -590,5 +655,44 @@ mod tests {
             .produce_ast(input.to_string())
             .expect("Unable to parse");
         assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn nested_call_expression() {
+        let expected = Program {
+            body: vec![Stmt::CallExpr {
+                args: vec![Stmt::CallExpr {
+                    args: vec![Stmt::NumericLiteral("5".to_owned())],
+                    caller: Box::new(Stmt::Identifier("print".to_owned())),
+                }],
+                caller: Box::new(Stmt::Identifier("print".to_string())),
+            }],
+        };
+
+        let input = r#"print(print(5));"#;
+
+        let mut parser = Parser::new();
+
+        let program = parser
+            .produce_ast(input.to_string())
+            .expect("Unable to parse");
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn const_requires_value() {
+        let input1 = r#"const foo;"#;
+        let input2 = r#"const foo = 6;"#;
+
+        let mut parser = Parser::new();
+
+        let error = parser.produce_ast(input1.to_string()).unwrap_err();
+        let result = parser.produce_ast(input2.to_string());
+
+        assert_eq!(
+            "A value is required for const assignment",
+            error.to_string()
+        );
+        assert!(result.is_ok());
     }
 }

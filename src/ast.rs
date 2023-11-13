@@ -6,6 +6,7 @@ pub enum Stmt {
     ObjectLiteral(Vec<Property>),
     NumericLiteral(String),
     Identifier(String),
+    Comment(String),
     FnDeclaration {
         name: String,
         parameters: Vec<String>,
